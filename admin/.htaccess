@@ -1,0 +1,11 @@
+# Admin panel - Optional IP whitelist
+# Uncomment below to restrict admin access to specific IPs
+
+# <Directory /public_html/admin>
+#     Order Deny,Allow
+#     Deny from all
+#     Allow from 203.0.113.0
+#     Allow from 198.51.100.0
+# </Directory>
+
+# Or use PHP-based IP check in admin/index.php

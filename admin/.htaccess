@@ -1,11 +1,31 @@
-# Admin panel - Optional IP whitelist
-# Uncomment below to restrict admin access to specific IPs
+# ================================================================
+#  OPTMS Invoice Manager — /public_html/admin/.htaccess
+#  Extra protection for super admin panel
+#  (PHP also enforces requireSuperAdmin() — this is defence in depth)
+# ================================================================
 
-# <Directory /public_html/admin>
-#     Order Deny,Allow
-#     Deny from all
-#     Allow from 203.0.113.0
-#     Allow from 198.51.100.0
-# </Directory>
+# No directory listing
+Options -Indexes
 
-# Or use PHP-based IP check in admin/index.php
+# ── Only allow index.php — block everything else ──────────────
+<FilesMatch "^(?!index\.php$)">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order Deny,Allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# ── Security Headers ──────────────────────────────────────────
+<IfModule mod_headers.c>
+    Header set X-Frame-Options "DENY"
+    Header set X-Content-Type-Options "nosniff"
+</IfModule>
+
+# ── Optional: Whitelist your IP only ─────────────────────────
+# Uncomment and replace with your actual IP to lock down admin
+# <IfModule mod_authz_core.c>
+#     Require ip 103.XXX.XXX.XXX
+# </IfModule>

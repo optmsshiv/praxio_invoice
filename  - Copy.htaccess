@@ -1,0 +1,78 @@
+# URL Routing and Security Headers for Invoice Application
+# Multi-Tenant Setup
+
+# Enable mod_rewrite
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Remove .php extension
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php?route=$1 [QSA,L]
+    
+    # Prevent direct access to config files
+    RewriteRule ^config/ - [F]
+    RewriteRule ^includes/ - [F]
+</IfModule>
+
+# Security Headers
+<IfModule mod_headers.c>
+    # Prevent clickjacking
+    Header set X-Frame-Options "SAMEORIGIN"
+    
+    # Prevent MIME sniffing
+    Header set X-Content-Type-Options "nosniff"
+    
+    # Enable XSS protection
+    Header set X-XSS-Protection "1; mode=block"
+    
+    # Referrer Policy
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Block direct access to PHP files in uploads
+<FilesMatch "\.(php|phtml|php3|php4|php5|phtml|phps)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order Deny,Allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Allow index files
+<FilesMatch "^index\.php$">
+    <IfModule mod_authz_core.c>
+        Require all granted
+    </IfModule>
+</FilesMatch>
+
+# Disable directory listing
+Options -Indexes
+
+# Set proper MIME types
+AddType application/json .json
+AddType application/javascript .js
+
+# Deny direct access to config and includes
+<FilesMatch "\.(sql)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+RewriteEngine On
+
+# Block direct access to config/ and includes/
+RewriteRule ^config/ - [F,L]
+RewriteRule ^includes/ - [F,L]
+
+# Force HTTPS (uncomment when SSL is active)
+# RewriteCond %{HTTPS} off
+# RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Prevent directory listing
+Options -Indexes
+
+# PHP error hiding
+php_flag display_errors off

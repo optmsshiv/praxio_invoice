@@ -89,7 +89,7 @@ try {
         }
 
         // Build DB name
-        $dbName = 'optms_' . preg_replace('/[^a-z0-9]/', '_', strtolower($slug));
+        $dbName = 'edrppymy_optms_' . preg_replace('/[^a-z0-9]/', '_', strtolower($slug));
         // Ensure DB name is unique
         $dbCheck = $master->prepare('SELECT id FROM tenants WHERE db_name=?');
         $dbCheck->execute([$dbName]);

@@ -9,8 +9,8 @@ if (!ob_get_level()) ob_start();
 // ── Master DB credentials ─────────────────────────────────────────
 define('MASTER_DB_HOST',    'localhost');
 define('MASTER_DB_NAME',    'edrppymy_optms_master');
-define('MASTER_DB_USER',    'edrppymy_optms_invoice');
-define('MASTER_DB_PASS',    '1234@Optmsdatabase');
+define('MASTER_DB_USER',    'edrppymy_optms_master');
+define('MASTER_DB_PASS',    '123@optms_master');
 define('MASTER_DB_CHARSET', 'utf8mb4');
 
 // ── App constants ─────────────────────────────────────────────────

@@ -261,73 +261,32 @@ function _randomPassword(int $len = 12): string {
     return $pass;
 }
 
-// ── cPanel UAPI helper ────────────────────────────────────────────
-function _cpanelApi(string $module, string $function, array $params = []): array {
-    $url = rtrim(CPANEL_HOST, '/') . "/execute/{$module}/{$function}";
-    if ($params) $url .= '?' . http_build_query($params);
-
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER     => ['Authorization: cpanel ' . CPANEL_USERNAME . ':' . CPANEL_API_TOKEN],
-        CURLOPT_SSL_VERIFYPEER => true,
-        CURLOPT_TIMEOUT        => 30,
-    ]);
-    $response = curl_exec($ch);
-    if ($response === false) {
-        $err = curl_error($ch);
-        curl_close($ch);
-        throw new RuntimeException("cPanel API request failed ({$module}::{$function}): {$err}");
-    }
-    curl_close($ch);
-
-    $data = json_decode($response, true);
-    if (!isset($data['status']) || $data['status'] != 1) {
-        $msg = $data['errors'][0] ?? ($data['error'] ?? 'Unknown cPanel API error');
-        throw new RuntimeException("cPanel API error ({$module}::{$function}): {$msg}");
-    }
-    return $data;
-}
-
 function _provisionTenantDB(string $dbName): void {
-    // cPanel auto-prepends the account username to DB names, so the
-    // create_database call needs just the suffix, not the full "user_"-prefixed name.
-    $prefix   = CPANEL_USERNAME . '_';
-    $dbSuffix = str_starts_with($dbName, $prefix) ? substr($dbName, strlen($prefix)) : $dbName;
-
-    // 1) Create the database via cPanel (this is the step that was missing —
-    //    the master DB user does not have privileges to CREATE DATABASE directly)
-    _cpanelApi('Mysql', 'create_database', ['name' => $dbSuffix]);
-
-    // 2) Grant the master DB user full privileges on the new database
-    _cpanelApi('Mysql', 'set_privileges_on_database', [
-        'user'       => MASTER_DB_USER,
-        'database'   => $dbName,
-        'privileges' => 'ALL PRIVILEGES',
-    ]);
-
-    // 3) Now that the DB exists and we have privileges, connect and run the schema
+    // Connect without DB selected to create it
     $pdo = new PDO(
-        'mysql:host=' . MASTER_DB_HOST . ';dbname=' . $dbName . ';charset=utf8mb4',
+        'mysql:host=' . MASTER_DB_HOST . ';charset=utf8mb4',
         MASTER_DB_USER, MASTER_DB_PASS,
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
     );
+
+    // Create the database
+    $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbName}`
+                CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+
+    // Switch to the new DB and run the tenant schema
+    $pdo->exec("USE `{$dbName}`");
 
     $schemaFile = __DIR__ . '/../config/tenant_schema.sql';
     if (!file_exists($schemaFile)) {
         throw new RuntimeException("tenant_schema.sql not found at: {$schemaFile}");
     }
 
-    // Strip SQL line comments (-- ...) and block comments (/* ... */) BEFORE
-    // splitting on ';'. The old code checked only whether each ;-delimited
-    // chunk *started* with '--', but phpMyAdmin dumps prefix nearly every
-    // real statement with a comment block, so that check was discarding
-    // almost all CREATE TABLE / ALTER TABLE statements.
-    $sql = file_get_contents($schemaFile);
-    $sql = preg_replace('/^--.*$/m', '', $sql);
-    $sql = preg_replace('/\/\*.*?\*\//s', '', $sql);
-
-    $statements = array_filter(array_map('trim', explode(';', $sql)), fn($s) => $s !== '');
+    // Execute schema SQL — split by semicolon, skip empty
+    $sql        = file_get_contents($schemaFile);
+    $statements = array_filter(
+        array_map('trim', explode(';', $sql)),
+        fn($s) => $s !== '' && !str_starts_with($s, '--')
+    );
     foreach ($statements as $stmt) {
         try {
             $pdo->exec($stmt);

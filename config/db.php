@@ -13,6 +13,14 @@ define('MASTER_DB_USER',    'edrppymy_optms_master');
 define('MASTER_DB_PASS',    '123@optms_master');
 define('MASTER_DB_CHARSET', 'utf8mb4');
 
+// ── cPanel API credentials (used for tenant DB provisioning) ───────
+// Fill these in with your NEW token — generate it fresh in
+// cPanel → Security → Manage API Tokens, since any token pasted
+// into a chat should be treated as compromised and revoked.
+define('CPANEL_HOST',      'https://praxio.optms.co.in:2083'); // confirm port (usually 2083)
+define('CPANEL_USERNAME',  'edrppymy');                         // confirm this is your cPanel login username
+define('CPANEL_API_TOKEN', 'BMN3WI0RGV07SO1GEHZCSTSLWP337Y97');
+
 // ── App constants ─────────────────────────────────────────────────
 define('APP_NAME',    'OPTMS Tech Invoice Manager');
 define('APP_VERSION', '2.0.0');

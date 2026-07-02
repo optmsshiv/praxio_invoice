@@ -2948,9 +2948,14 @@ View Invoice: {{6}}</pre></details>
             <div style="font-size:20px;font-weight:800">👥 Team</div>
             <div style="font-size:13px;color:var(--muted);margin-top:2px">Manage users who can access this account</div>
           </div>
-          <button class="btn btn-primary" onclick="openAddUserModal()">
-            <i class="fas fa-user-plus"></i> Add User
-          </button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline" onclick="openChangePasswordModal()" style="font-size:13px">
+              <i class="fas fa-key"></i> Change Password
+            </button>
+            <button class="btn btn-primary" onclick="openAddUserModal()">
+              <i class="fas fa-user-plus"></i> Add User
+            </button>
+          </div>
         </div>
         <div id="team-list-wrap">
           <div style="text-align:center;padding:40px;color:var(--muted)">Loading…</div>
@@ -3892,6 +3897,7 @@ function canManageUsers()  { return hasRole('owner'); }
 const STATE = {
   // ── User / Role ─────────────────────────────────────────────
   role:        <?= json_encode($_userRole) ?>,
+  tenantId:    <?= json_encode((int)($_SESSION['tenant_id'] ?? 0)) ?>,
   userName:    <?= json_encode($_userName) ?>,
   userEmail:   <?= json_encode($_userEmail) ?>,
   tenantSlug:  <?= json_encode($_tenantSlug) ?>,
@@ -15083,13 +15089,13 @@ function applyAvatarGlow(img) {
 // TEAM PAGE
 // ══════════════════════════════════════════════════════════════
 async function renderTeamPage() {
-  if (!hasRole('owner')) { toast('⛔ Access denied', 'error'); return; }
+  if (!hasRole('admin')) { toast('⛔ Only admins and owners can manage the team', 'error'); return; }
   const wrap = document.getElementById('team-list-wrap');
   if (!wrap) return;
   wrap.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">Loading…</div>';
 
   try {
-    const data = await api('api/tenant.php?action=users&tenant_id=' + (STATE.tenantId || ''));
+    const data = await api('api/users.php?action=list');
     const users = data.data || [];
 
     const ROLE_COLORS = {
@@ -15156,7 +15162,7 @@ async function renderTeamPage() {
 }
 
 function openAddUserModal() {
-  if (!hasRole('owner')) { toast('⛔ Access denied', 'error'); return; }
+  if (!hasRole('owner')) { toast('⛔ Only the account owner can add users', 'error'); return; }
   Swal.fire({
     title: 'Add Team Member',
     html: `
@@ -15191,8 +15197,7 @@ function openAddUserModal() {
       const email = document.getElementById('swal-uemail').value.trim();
       if (!email) { Swal.showValidationMessage('Email is required'); return false; }
       try {
-        const r = await api('api/tenant.php?action=add_user', 'POST', {
-          tenant_id: STATE.tenantId,
+        const r = await api('api/users.php?action=add', 'POST', {
           name:      document.getElementById('swal-uname').value.trim(),
           email,
           role:      document.getElementById('swal-urole').value,
@@ -15230,7 +15235,7 @@ async function removeTeamUser(id, name) {
     confirmButtonText: 'Remove',
   });
   if (!confirm.isConfirmed) return;
-  await api('api/tenant.php?action=remove_user', 'PATCH', { user_id: id });
+  await api('api/users.php?action=remove', 'PATCH', { user_id: id });
   toast('User removed', 'success');
   renderTeamPage();
 }
@@ -15240,10 +15245,53 @@ const _origShowPage = window.showPage || showPage;
 const _teamOrigShowPage = showPage;
 // renderTeamPage is called from showPage via name==='team' check inside renderPage
 // Actually wire it up via the existing renderPage/showPage pattern:
-document.addEventListener('DOMContentLoaded', () => {
-  // Store tenant_id from session for API calls
-  STATE.tenantId = <?= json_encode($_SESSION['tenant_id'] ?? null) ?>;
-});
+// STATE.tenantId is set at STATE init above
+
+// ── Change Password Modal ───────────────────────────────────────
+function openChangePasswordModal() {
+  Swal.fire({
+    title: '🔑 Change Password',
+    html: `
+      <div style="text-align:left">
+        <div style="margin-bottom:12px">
+          <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px">Current Password</label>
+          <input id="swal-curr-pass" type="password" class="swal2-input" placeholder="Current password" style="margin:0;width:100%">
+        </div>
+        <div style="margin-bottom:12px">
+          <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px">New Password</label>
+          <input id="swal-new-pass" type="password" class="swal2-input" placeholder="Min 8 characters" style="margin:0;width:100%">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px">Confirm New Password</label>
+          <input id="swal-conf-pass" type="password" class="swal2-input" placeholder="Repeat new password" style="margin:0;width:100%">
+        </div>
+      </div>`,
+    confirmButtonText: 'Change Password',
+    confirmButtonColor: '#00897B',
+    showCancelButton: true,
+    preConfirm: async () => {
+      const curr = document.getElementById('swal-curr-pass').value;
+      const newP = document.getElementById('swal-new-pass').value;
+      const conf = document.getElementById('swal-conf-pass').value;
+      if (!curr)         { Swal.showValidationMessage('Current password required'); return false; }
+      if (newP.length < 8){ Swal.showValidationMessage('New password must be at least 8 characters'); return false; }
+      if (newP !== conf) { Swal.showValidationMessage('Passwords do not match'); return false; }
+      try {
+        const r = await api('api/users.php?action=change_password', 'PATCH', {
+          current_password: curr,
+          new_password:     newP,
+        });
+        if (!r.success) { Swal.showValidationMessage(r.error || 'Failed'); return false; }
+        return true;
+      } catch(e) { Swal.showValidationMessage(e.message); return false; }
+    }
+  }).then(result => {
+    if (result.isConfirmed) {
+      toast('✅ Password changed successfully', 'success');
+    }
+  });
+}
+
 
 </script>
 

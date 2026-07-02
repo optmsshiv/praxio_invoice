@@ -283,8 +283,12 @@ function _cpanelApi(string $module, string $function, array $params = []): array
 
     $data = json_decode($response, true);
     if (!isset($data['status']) || $data['status'] != 1) {
-        $msg = $data['errors'][0] ?? ($data['error'] ?? 'Unknown cPanel API error');
-        throw new RuntimeException("cPanel API error ({$module}::{$function}): {$msg}");
+        // TEMP DEBUG: surface the full raw response so we can see what
+        // cPanel actually said, instead of just the generic summary line.
+        error_log("cPanel API raw response ({$module}::{$function}): " . $response);
+        throw new RuntimeException(
+            "cPanel API error ({$module}::{$function}): " . $response
+        );
     }
     return $data;
 }

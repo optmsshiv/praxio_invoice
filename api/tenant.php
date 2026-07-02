@@ -303,7 +303,7 @@ function _provisionTenantDB(string $dbName): void {
     _cpanelApi('Mysql', 'set_privileges_on_database', [
         'user'       => MASTER_DB_USER,
         'database'   => $dbName,
-        'privileges' => 'ALL PRIVILEGES',
+        'privileges' => 'ALL',
     ]);
 
     // 3) Now that the DB exists and we have privileges, connect and run the schema

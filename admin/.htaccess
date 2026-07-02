@@ -8,7 +8,7 @@
 Options -Indexes
 
 # ── Only allow index.php — block everything else ──────────────
-<FilesMatch "^(?!index\.php$)">
+<FilesMatch "^(?!index\.php$).+\.(php|inc|log|sql|env|bak|ini|conf)$">
     <IfModule mod_authz_core.c>
         Require all denied
     </IfModule>
